@@ -13,5 +13,3 @@ assignees: ''
 ## Description
 
 [Provide a detailed description of the new feature you are requesting...]
-
-... (the rest of your template content)

@@ -12,5 +12,4 @@ assignees: ''
 
 ## Description
 
-[Provide a clear and detailed description...]
-... (the rest of your content)
+## Steps to Reproduce
