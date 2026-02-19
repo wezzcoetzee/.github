@@ -3,10 +3,8 @@
 ## Setup
 
 ```bash
-git clone https://github.com/wesleycoetzee/.github.git
+git clone https://github.com/wezzcoetzee/.github.git
 cd .github
-chmod +x .git-hooks/commit-msg
-git config core.hooksPath .git-hooks
 ```
 
 ## Branch Naming
@@ -31,8 +29,6 @@ This repo enforces [Conventional Commits](https://www.conventionalcommits.org/):
 
 **Types:** `feat`, `fix`, `docs`, `style`, `refactor`, `perf`, `test`, `build`, `ci`, `chore`, `revert`
 
-The `commit-msg` hook will reject commits that don't match this format.
-
 ## Pull Request Process
 
 1. Branch off `main`
@@ -43,4 +39,4 @@ The `commit-msg` hook will reject commits that don't match this format.
 
 ## Code Style
 
-Formatting is enforced via Prettier. Run `prettier --write .` before committing, or configure your editor to format on save using the `.editorconfig` and `.prettierrc.json` in this repo.
+Formatting is enforced via `.editorconfig`. Configure your editor to respect EditorConfig settings.
