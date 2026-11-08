@@ -1,0 +1,96 @@
+name: macOS Release
+
+on:
+  workflow_call:
+    inputs:
+      runner:
+        description: macOS runner label with the required Xcode and Swift toolchain.
+        type: string
+        default: macos-26
+      setup-command:
+        description: Optional setup command, for example brew install xcodegen.
+        type: string
+        default: ""
+      build-command:
+        description: Build and sign the app, then package release files. VERSION is the tag without a leading v.
+        type: string
+        default: ./make-app.sh "$VERSION"
+      artifacts:
+        description: Newline-separated file globs relative to the repository root. Each must match at least one file.
+        type: string
+        default: |
+          dist/*.dmg
+          dist/*.zip
+      prerelease:
+        description: Mark a newly created release as a prerelease.
+        type: boolean
+        default: false
+
+jobs:
+  release:
+    runs-on: ${{ inputs.runner }}
+    permissions:
+      contents: write
+    concurrency:
+      group: macos-release-${{ github.repository }}-${{ github.ref }}
+      cancel-in-progress: false
+    steps:
+      - name: Require a tag
+        env:
+          REF_TYPE: ${{ github.ref_type }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          if [[ "$REF_TYPE" != tag ]]; then
+            echo '::error::This workflow must run against a tag.'
+            exit 1
+          fi
+          echo "VERSION=${TAG#v}" >> "$GITHUB_ENV"
+
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+
+      - name: Set up build tools
+        if: inputs.setup-command != ''
+        run: ${{ inputs.setup-command }}
+
+      - name: Build and package
+        run: ${{ inputs.build-command }}
+
+      - name: Publish release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          TAG: ${{ github.ref_name }}
+          ARTIFACT_PATTERNS: ${{ inputs.artifacts }}
+          PRERELEASE: ${{ inputs.prerelease }}
+        run: |
+          python3 <<'PY'
+          import glob
+          import os
+          import subprocess
+
+          files = set()
+          for pattern in os.environ["ARTIFACT_PATTERNS"].splitlines():
+              if not pattern.strip():
+                  continue
+              matches = [path for path in glob.glob(pattern.strip()) if os.path.isfile(path)]
+              if not matches:
+                  raise SystemExit(f"No release files match: {pattern}")
+              files.update(os.path.abspath(path) for path in matches)
+          if not files:
+              raise SystemExit("No release files configured")
+          names = [os.path.basename(path) for path in files]
+          if len(names) != len(set(names)):
+              raise SystemExit("Release files must have unique filenames")
+
+          tag = os.environ["TAG"]
+          exists = subprocess.run(["gh", "release", "view", tag], capture_output=True)
+          if exists.returncode != 0:
+              command = ["gh", "release", "create", tag, "--verify-tag", "--generate-notes"]
+              if os.environ["PRERELEASE"] == "true":
+                  command.append("--prerelease")
+              subprocess.run(command + sorted(files), check=True)
+          else:
+              subprocess.run(["gh", "release", "upload", tag, "--clobber", *sorted(files)], check=True)
+          PY
