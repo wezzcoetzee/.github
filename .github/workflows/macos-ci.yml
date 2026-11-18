@@ -1,0 +1,44 @@
+name: macOS CI
+
+# Lints and tests a macOS app on pull requests. Detects the project type:
+# a project.yml means an XcodeGen app whose project and scheme share its `name:`,
+# anything else is a SwiftPM package.
+
+on:
+  workflow_call:
+    inputs:
+      runner:
+        description: macOS runner label with the required Xcode and Swift toolchain.
+        type: string
+        default: macos-26
+
+jobs:
+  test:
+    runs-on: ${{ inputs.runner }}
+    permissions:
+      contents: read
+    concurrency:
+      group: macos-ci-${{ github.repository }}-${{ github.ref }}
+      cancel-in-progress: true
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      # Opt-in: a committed .swift-format config turns on strict linting.
+      # Runs before the build so .build/ is never linted.
+      - name: Lint
+        if: hashFiles('.swift-format') != ''
+        run: swift format lint --strict --recursive --parallel .
+
+      - name: Test
+        run: |
+          if [[ ! -f project.yml ]]; then
+            swift test
+            exit
+          fi
+          brew install xcodegen
+          xcodegen generate
+          name=$(awk '/^name:/ { print $2; exit }' project.yml)
+          xcodebuild test -project "$name.xcodeproj" -scheme "$name" -destination platform=macOS -quiet \
+            CODE_SIGN_IDENTITY=- CODE_SIGN_STYLE=Manual DEVELOPMENT_TEAM=

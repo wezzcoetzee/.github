@@ -15,9 +15,28 @@ Default [community health files](https://docs.github.com/en/communities/setting-
 | `.github/ISSUE_TEMPLATE/` | Bug report and feature request forms |
 | `.github/CODEOWNERS` | Default code owners |
 | `.github/dependabot.yml` | Automated dependency updates |
-| `.github/workflows/` | Local automation and a reusable macOS release workflow |
+| `.github/workflows/` | Local automation and reusable macOS CI and release workflows |
 
 GitHub uses the community health files, issue/PR templates and funding configuration as defaults for repositories that don't define their own. Workflows, CODEOWNERS, Dependabot configuration and the license are not inherited. The PR linting, auto-labeling and stale workflows only run in this repository.
+
+## macOS CI
+
+Add `.github/workflows/ci.yml` to an app repository to lint and test every pull request and push to `main`:
+
+```yaml
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  macos:
+    uses: wezzcoetzee/.github/.github/workflows/macos-ci.yml@main
+```
+
+The reusable workflow needs no configuration. On `macos-26` it detects the project type: a repository with a `project.yml` is an XcodeGen app, generated and tested with `xcodebuild test` using the scheme named by `project.yml`'s `name:` and ad-hoc signing, and anything else runs `swift test`. Linting is opt-in: commit a `.swift-format` configuration and the workflow runs `swift format lint --strict` before testing. Use the `runner` input to pick a different macOS runner.
 
 ## macOS releases
 
