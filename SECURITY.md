@@ -11,19 +11,6 @@ Include:
 - Steps to reproduce
 - Any suggested fixes or mitigations
 
-## Response SLA
+Reports are handled best-effort, with security issues prioritised over other work. Only the latest version on `main` receives fixes.
 
-| Severity | Initial Response | Target Fix |
-|----------|-----------------|------------|
-| Critical | 24 hours | 7 days |
-| High | 48 hours | 14 days |
-| Medium | 5 days | 30 days |
-| Low | 10 days | Next release |
-
-## Supported Versions
-
-Only the latest version on `main` receives security fixes.
-
-## Disclosure Policy
-
-Once a fix is merged and released, a security advisory will be published crediting the reporter (unless they prefer to remain anonymous).
+Once a fix is released, a security advisory will be published crediting the reporter (unless they prefer to remain anonymous).

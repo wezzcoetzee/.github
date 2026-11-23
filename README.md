@@ -6,18 +6,15 @@ Default [community health files](https://docs.github.com/en/communities/setting-
 
 | File | Purpose |
 |------|---------|
-| `CODE_OF_CONDUCT.md` | Contributor Covenant v2.1 |
-| `CONTRIBUTING.md` | Contribution guidelines |
 | `SECURITY.md` | Vulnerability disclosure policy |
 | `SUPPORT.md` | How to get help |
 | `LICENSE` | MIT License |
 | `.github/PULL_REQUEST_TEMPLATE.md` | Default PR template |
 | `.github/ISSUE_TEMPLATE/` | Bug report and feature request forms |
-| `.github/CODEOWNERS` | Default code owners |
 | `.github/dependabot.yml` | Automated dependency updates |
-| `.github/workflows/` | Local automation and reusable macOS CI and release workflows |
+| `.github/workflows/` | Reusable macOS CI and release workflows, plus this repo's own linting |
 
-GitHub uses the community health files, issue/PR templates and funding configuration as defaults for repositories that don't define their own. Workflows, CODEOWNERS, Dependabot configuration and the license are not inherited. The PR linting, auto-labeling and stale workflows only run in this repository.
+GitHub uses the community health files and issue/PR templates as defaults for repositories that don't define their own. Workflows, Dependabot configuration and the license are not inherited. The PR title lint and actionlint workflows only run in this repository.
 
 ## macOS CI
 
