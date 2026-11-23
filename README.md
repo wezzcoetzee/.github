@@ -35,6 +35,40 @@ jobs:
 
 The reusable workflow needs no configuration. On `macos-26` it detects the project type: a repository with a `project.yml` is an XcodeGen app, generated and tested with `xcodebuild test` using the scheme named by `project.yml`'s `name:` and ad-hoc signing, and anything else runs `swift test`. Linting is opt-in: commit a `.swift-format` configuration and the workflow runs `swift format lint --strict` before testing. Use the `runner` input to pick a different macOS runner.
 
+### Skip docs-only changes
+
+Set `paths-ignore` to skip the tests when every changed file matches one of its globs:
+
+```yaml
+  macos:
+    uses: wezzcoetzee/.github/.github/workflows/macos-ci.yml@main
+    with:
+      paths-ignore: |
+        **/*.md
+        docs
+        LICENSE
+```
+
+```mermaid
+flowchart LR
+  E["PR or push"] --> X{"paths-ignore set?"}
+  X -- no --> T["test"]
+  X -- yes --> C["changes<br/>compare API"] --> M{"every file ignored?"}
+  M -- no --> T
+  M -- yes --> S["test skipped<br/>required check passes"]
+```
+
+- A pattern that names a directory covers everything inside it: `docs` matches `docs/setup/install.md`. `**` spans directories, while `*` and `?` stay within one segment, so use `**/*.md` rather than `*.md` to match Markdown in every folder. Blank lines and `#` comments are ignored.
+- A rename counts at both its old and new path.
+- When the answer is unknown, the tests run: manual runs, pushes that create a branch, API errors and diffs of 300+ files (the compare API's limit).
+- Use this input rather than a trigger-level `paths-ignore:`. A workflow skipped by its trigger never reports, so a required `macos / test` check would block the PR. A skipped job reports success.
+- The `changes` job only runs when `paths-ignore` is set, on `ubuntu-latest`.
+
+| Input | Default | Purpose |
+|---|---|---|
+| `runner` | `macos-26` | Choose a macOS runner with the app's required Xcode/Swift version. |
+| `paths-ignore` | Empty | Globs, one per line. Skip the tests when every changed file matches one. |
+
 ## macOS releases
 
 Add `.github/workflows/release.yml` to an app repository to build and publish a GitHub Release when you push a version tag:

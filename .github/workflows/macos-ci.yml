@@ -2,7 +2,9 @@ name: macOS CI
 
 # Lints and tests a macOS app on pull requests. Detects the project type:
 # a project.yml means an XcodeGen app whose project and scheme share its `name:`,
-# anything else is a SwiftPM package.
+# anything else is a SwiftPM package. With `paths-ignore` set, `changes` skips
+# `test` when every changed file is ignored; a skipped job still satisfies a
+# required status check.
 
 on:
   workflow_call:
@@ -11,9 +13,94 @@ on:
         description: macOS runner label with the required Xcode and Swift toolchain.
         type: string
         default: macos-26
+      paths-ignore:
+        description: >-
+          Newline-separated globs, relative to the repo root. When every file a
+          PR or push changes matches one, `test` is skipped. A directory pattern
+          such as `docs` covers everything inside it. Empty always runs.
+        type: string
+        default: ""
 
 jobs:
+  # Decides whether anything outside `paths-ignore` changed. Only runs when
+  # `paths-ignore` is set; anything it can't decide (no base commit, API error,
+  # 300+ files) runs the tests rather than risk skipping them.
+  changes:
+    if: inputs.paths-ignore != ''
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    outputs:
+      run: ${{ steps.match.outputs.run }}
+    steps:
+      - name: Match changed files
+        id: match
+        env:
+          GH_TOKEN: ${{ github.token }}
+          IGNORE_PATTERNS: ${{ inputs.paths-ignore }}
+        run: |
+          python3 -I - <<'PY'
+          import json, os, re, urllib.request
+
+          # `**` spans directories, `*` and `?` stay within one path segment.
+          TOKENS = {"**/": "(?:.*/)?", "**": ".*", "*": "[^/]*", "?": "[^/]"}
+
+          def compile_glob(pattern):
+              parts = re.split(r"(\*\*/|\*\*|\*|\?)", pattern.removeprefix("./").strip("/"))
+              return re.compile("".join(TOKENS.get(part, re.escape(part)) for part in parts))
+
+          patterns = [compile_glob(line.strip()) for line in os.environ["IGNORE_PATTERNS"].splitlines()
+                      if line.strip() and not line.strip().startswith("#")]
+
+          # A pattern that names a directory covers everything inside it.
+          def ignored(path):
+              segments = path.split("/")
+              prefixes = ["/".join(segments[:i]) for i in range(1, len(segments) + 1)]
+              return any(p.fullmatch(prefix) for p in patterns for prefix in prefixes)
+
+          def decide():
+              event_name = os.environ["GITHUB_EVENT_NAME"]
+              with open(os.environ["GITHUB_EVENT_PATH"]) as f:
+                  event = json.load(f)
+              if event_name.startswith("pull_request"):
+                  base, head = event["pull_request"]["base"]["sha"], event["pull_request"]["head"]["sha"]
+              elif event_name == "push" and event.get("before", "").strip("0"):
+                  base, head = event["before"], event["after"]
+              else:
+                  return True, f"{event_name} event has no base commit to compare"
+
+              url = f"{os.environ['GITHUB_API_URL']}/repos/{os.environ['GITHUB_REPOSITORY']}/compare/{base}...{head}"
+              request = urllib.request.Request(url, headers={
+                  "Authorization": f"Bearer {os.environ['GH_TOKEN']}",
+                  "Accept": "application/vnd.github+json",
+              })
+              try:
+                  with urllib.request.urlopen(request, timeout=30) as response:
+                      files = json.load(response).get("files", [])
+              except Exception as error:
+                  print(f"::warning::Could not list changed files ({error}); running anyway.")
+                  return True, "changed files unavailable"
+
+              # The compare API lists at most 300 files, so a longer list may be truncated.
+              if len(files) >= 300:
+                  return True, "300+ changed files"
+              # A rename counts as a change at both its old and new path.
+              for file in files:
+                  for path in (file["filename"], file.get("previous_filename")):
+                      if path and not ignored(path):
+                          return True, f"{path} is not ignored"
+              return False, f"all {len(files)} changed files match paths-ignore"
+
+          run, reason = decide()
+          print(f"{'Running' if run else 'Skipping'}: {reason}")
+          with open(os.environ["GITHUB_OUTPUT"], "a") as output:
+              output.write(f"run={str(run).lower()}\n")
+          PY
+
   test:
+    needs: changes
+    if: ${{ !cancelled() && needs.changes.result != 'failure' && needs.changes.outputs.run != 'false' }}
     runs-on: ${{ inputs.runner }}
     permissions:
       contents: read
